@@ -3,7 +3,7 @@ from utils.page_components import add_common_page_elements
 import pandas as pd
 import plotly.express as px
 from classes.vis import create_team_distribution_plot, create_reaction_distribution_plot
-
+from classes.team_defense import TeamDefenseDescription
 # Setup containers
 sidebar_container = add_common_page_elements()
 page_body = st.container()
@@ -172,3 +172,50 @@ with page_body:
         # Optional: adjust plot height
         plot.fig.update_layout(height=800)
         plot.show()
+
+    # --- AI Description Section ---
+st.markdown("---")
+st.subheader("AI‑Generated Team Defense Description")
+
+# Choose the correct dataframe based on category
+if selected_category == "Susceptibility to Counter-Attack":
+    df_current = df_sus
+else:
+    df_current = df_reac
+
+# Get the row for the selected team
+team_row = df_current[df_current["team_shortname"] == selected_team]
+if team_row.empty:
+    st.warning(f"No data found for {selected_team} in the {selected_category} dataset.")
+else:
+    row = team_row.iloc[0]
+
+    # Build metrics dictionary based on category
+    if selected_category == "Susceptibility to Counter-Attack":
+        metrics = {
+            'convex_hull_area': row['team_convex_hull_raw_zscore_x'],
+            'avg_dist_centroid': row['player_dist_from_centroid_zscore_x'],
+            'length_stretch': row['team_stretch_y_zscore_x'],   # vertical stretch
+            'width_stretch': row['team_stretch_x_zscore_x'],    # horizontal stretch
+            'num_defenders_behind_ball': row['team_defenders_behind_zscore_x'],
+            'distance_from_goal': row['z_avg_distance'],
+            'on_ball_threat': row['z_avg_onball_threat'],
+            'support_threat': row['z_avg_support_threat'],
+        }
+    else:  # Reaction to Counter-Attack
+        # Map only available columns (some metrics may not exist in reaction data)
+        metrics = {
+            'convex_hull_area': row.get('team_convex_hull_raw_start_zscore', 0.0),
+            'avg_dist_centroid': row.get('player_dist_from_centroid_start_zscore', 0.0),
+            'length_stretch': row.get('team_stretch_y_start_zscore', 0.0),
+            'width_stretch': row.get('team_stretch_x_start_zscore', 0.0),
+            'num_defenders_behind_ball': row.get('team_defenders_behind_start_avg', 0.0),
+            'distance_from_goal': 0.0,  # not available, set to 0 or omit
+            'on_ball_threat': 0.0,
+            'support_threat': 0.0,
+        }
+
+    # Instantiate and generate description
+    desc = TeamDefenseDescription(team_name=selected_team, metrics=metrics)
+    answer = desc.stream_gpt(temperature=0.7)
+    st.write(answer)
