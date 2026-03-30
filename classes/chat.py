@@ -71,19 +71,19 @@ class Chat:
         message = {"role": role, "content": content}
         self.messages_to_display.append(message)
 
-    # def get_input(self):
-    #     """
-    #     Get input from streamlit."""
+    def get_input(self):
+        """
+        Get input from streamlit."""
 
-    #     if x := st.chat_input(
-    #         placeholder=f"What else would you like to know about {self.player.name}?"
-    #     ):
-    #         if len(x) > 500:
-    #             st.error(
-    #                 f"Your message is too long ({len(x)} characters). Please keep it under 500 characters."
-    #             )
+        if x := st.chat_input(
+            placeholder=f"What else would you like to know about {self.name}?"
+        ):
+            if len(x) > 500:
+                st.error(
+                    f"Your message is too long ({len(x)} characters). Please keep it under 500 characters."
+                )
 
-    #         self.handle_input(x)
+            self.handle_input(x)
 
     def handle_input(self, input, reasoning_effort=None, temperature=1, stream=False):
         """
@@ -477,16 +477,52 @@ class PersonChat(Chat):
 
         return ret_val
 
-    def get_input(self):
-        """
-        Get input from streamlit."""
 
-        if x := st.chat_input(
-            placeholder=f"What else would you like to know about {self.person.name}?"
-        ):
-            if len(x) > 500:
-                st.error(
-                    f"Your message is too long ({len(x)} characters). Please keep it under 500 characters."
-                )
 
-            self.handle_input(x, stream=True)
+# ---------------------------------------------------------------------------
+# Defensive Transition
+# ---------------------------------------------------------------------------
+
+class TeamChat(Chat):
+
+    def __init__(self, chat_hash, team, teams):
+        self.team = team
+        self.teams = teams
+        super().__init__(chat_hash)
+
+    def instruction_messages(self):
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert tactical football analyst specialising in defensive transitions. "
+                    "You analyse how Premier League teams behave when they lose possession in the attacking third. "
+                    "Use the statistical data provided to give clear, grounded, and insightful tactical analysis."
+                ),
+            },
+            {
+                "role": "user",
+                "content": "What is your role in this conversation?",
+            },
+            {
+                "role": "assistant",
+                "content": (
+                    "My role is to help you understand how Premier League teams perform "
+                    "in defensive transition — specifically how exposed they are when losing "
+                    "possession high up the pitch and how quickly they react to counter-attacks. "
+                    "I base my analysis on the data you have provided."
+                ),
+            },
+        ]
+
+    def get_relevant_info(self, query):
+        from classes.description import TeamDescription
+
+        if query == "":
+            query = self.visible_messages[-1]["content"]
+
+        ret_val = f"Here is a statistical description of {self.team.name}'s defensive transition:\n\n"
+        description = TeamDescription(self.team, quality=self.team.quality)
+        ret_val += description.synthesize_text()
+        return ret_val
+

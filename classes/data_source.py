@@ -76,7 +76,7 @@ class Stats(Data):
 
         # Here we get opposite value of metrics if their weight is negative
         for metric in set(self.negative_metrics).intersection(self.metrics):
-            df_z[metric] = df_z[metric] * -1
+            df_z[f"{metric}_Z"] = df_z[f"{metric}_Z"] * -1
         return df_z
 
     def get_ranks(self, df):
@@ -576,3 +576,120 @@ class PersonStat(Stats):
         ser_metrics = self.df.squeeze()
 
         return self.data_point_class(id=id, name=name, ser_metrics=ser_metrics)
+
+
+# ---------------------------------------------------------------------------
+# Defensive Transition
+# ---------------------------------------------------------------------------
+
+SUSCEPTIBILITY_METRICS = [
+    "total_losses",
+    "cumulative_onball_threat",
+    "cumulative_support_threat",
+    "defensive_coverage_area_at_loss_avg",
+    "spread_at_loss_avg",
+    "vertical_compactness_at_loss_avg",
+    "horizontal_compactness_at_loss_avg",
+    "number_of_defenders_behind_the_ball_at_loss_avg",
+    "attackers_distance_to_goal_avg",
+    "avg_onball_threat",
+    "avg_support_threat",
+]
+
+SUSCEPTIBILITY_NEGATIVE_METRICS = [
+    "defensive_coverage_area_at_loss_avg",
+    "spread_at_loss_avg",
+    "vertical_compactness_at_loss_avg",
+    "horizontal_compactness_at_loss_avg",
+    "total_losses",
+    "cumulative_onball_threat",
+    "cumulative_support_threat",
+    "avg_onball_threat",
+    "avg_support_threat",
+    "attackers_distance_to_goal_avg",
+]
+
+REACTION_METRICS = [
+    "total_losses",
+    "dangerous_windows",
+    "dangerous_rate",
+    "reaction_time",
+    "number_of_defenders_behind_the_ball_danger_start",
+    "number_of_defenders_behind_the_ball_danger_end",
+    "spread_danger_start",
+    "spread_danger_end",
+    "defensive_coverage_area_danger_start",
+    "defensive_coverage_area_danger_end",
+    "horizontal_compactness_danger_start",
+    "horizontal_compactness_danger_end",
+    "vertical_compactness_danger_start",
+    "vertical_compactness_danger_end",
+]
+
+REACTION_NEGATIVE_METRICS = [
+    "total_losses",
+    "dangerous_windows",
+    "dangerous_rate",
+    "reaction_time",
+    "spread_danger_start",
+    "spread_danger_end",
+    "defensive_coverage_area_danger_start",
+    "defensive_coverage_area_danger_end",
+    "horizontal_compactness_danger_start",
+    "horizontal_compactness_danger_end",
+    "vertical_compactness_danger_start",
+    "vertical_compactness_danger_end",
+]
+
+
+class TeamStats(Stats):
+    data_point_class = data_point.Team
+
+    QUALITY_SUSCEPTIBILITY = "Susceptibility to Counterattack"
+    QUALITY_REACTION = "Reaction to Counterattack"
+
+    def __init__(self, quality: str):
+        self.quality = quality
+
+        if quality == self.QUALITY_SUSCEPTIBILITY:
+            self._metrics = SUSCEPTIBILITY_METRICS
+            self._negative_metrics = SUSCEPTIBILITY_NEGATIVE_METRICS
+            self._csv_path = "data/defensive_transition/Susceptibility_Quality.csv"
+        else:
+            self._metrics = REACTION_METRICS
+            self._negative_metrics = REACTION_NEGATIVE_METRICS
+            self._csv_path = "data/defensive_transition/Reaction to counter attack.csv"
+
+        super().__init__()
+
+    def get_raw_data(self) -> pd.DataFrame:
+        return pd.read_csv(self._csv_path)
+
+    def process_data(self, df_raw: pd.DataFrame) -> pd.DataFrame:
+        df_raw = df_raw.dropna(subset=["team"])
+        df_raw = df_raw.reset_index(drop=True)
+
+        if len(df_raw) < 2:
+            raise Exception("Not enough teams in the dataset")
+
+        return df_raw
+
+    def to_data_point(self) -> data_point.Team:
+        id = self.df.index[0]
+
+        # Reindex so positional access is safe
+        self.df.reset_index(drop=True, inplace=True)
+
+        name = self.df["team"][0]
+
+        # Convert to series (drop the team name column first)
+        ser_metrics = self.df.drop(columns=["team"]).squeeze()
+
+        return self.data_point_class(
+            id=id,
+            name=name,
+            ser_metrics=ser_metrics,
+            relevant_metrics=self.metrics,
+            quality=self.quality,
+        )
+

@@ -153,3 +153,19 @@ def create_chat(to_hash, chat_class, *args, **kwargs):
     chat_hash_state = hash(to_hash)
     chat = chat_class(chat_hash_state, *args, **kwargs)
     return chat
+
+
+def select_team(container, teams):
+    """Select a team from the sidebar and return a Team data point."""
+    import copy
+    team = copy.deepcopy(teams)
+
+    with container:
+        team.select_and_filter(
+            column_name="team",
+            label="Team",
+        )
+        team = team.to_data_point()
+
+    return team
+

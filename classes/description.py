@@ -740,3 +740,125 @@ class PersonDescription(Description):
             "Finally, summarise exactly how the person compares to others in the same position. "
         )
         return [{"role": "user", "content": prompt}]
+
+
+# ---------------------------------------------------------------------------
+# Defensive Transition
+# ---------------------------------------------------------------------------
+
+class TeamDescription(Description):
+
+    QUALITY_SUSCEPTIBILITY = "Susceptibility to Counterattack"
+    QUALITY_REACTION = "Reaction to Counterattack"
+
+    # Friendly display names for each metric
+    METRIC_LABELS = {
+        # Susceptibility
+        "total_losses": "total ball losses in the attacking third",
+        "cumulative_onball_threat": "cumulative on-ball threat conceded",
+        "cumulative_support_threat": "cumulative support threat conceded",
+        "defensive_coverage_area_at_loss_avg": "defensive coverage area at moment of ball loss",
+        "spread_at_loss_avg": "spread of players from team centre at ball loss",
+        "vertical_compactness_at_loss_avg": "vertical compactness at ball loss",
+        "horizontal_compactness_at_loss_avg": "horizontal compactness at ball loss",
+        "number_of_defenders_behind_the_ball_at_loss_avg": "number of defenders behind the ball at ball loss",
+        "attackers_distance_to_goal_avg": "average distance of attackers from their own goal at ball loss",
+        "avg_onball_threat": "average on-ball threat per loss",
+        "avg_support_threat": "average support threat per loss",
+        # Reaction
+        "dangerous_windows": "number of dangerous counter-attack windows",
+        "dangerous_rate": "rate of turnovers becoming dangerous",
+        "reaction_time": "team reaction time to counter-attack",
+        "number_of_defenders_behind_the_ball_danger_start": "defenders behind ball at start of danger window",
+        "number_of_defenders_behind_the_ball_danger_end": "defenders behind ball at end of danger window",
+        "spread_danger_start": "team spread at start of danger window",
+        "spread_danger_end": "team spread at end of danger window",
+        "defensive_coverage_area_danger_start": "defensive coverage area at start of danger window",
+        "defensive_coverage_area_danger_end": "defensive coverage area at end of danger window",
+        "horizontal_compactness_danger_start": "horizontal compactness at start of danger window",
+        "horizontal_compactness_danger_end": "horizontal compactness at end of danger window",
+        "vertical_compactness_danger_start": "vertical compactness at start of danger window",
+        "vertical_compactness_danger_end": "vertical compactness at end of danger window",
+    }
+
+    def __init__(self, team, quality: str):
+        self.team = team
+        self.quality = quality
+        super().__init__()
+
+    @property
+    def gpt_examples_path(self) -> str:
+        if self.quality == self.QUALITY_SUSCEPTIBILITY:
+            return f"{self.gpt_examples_base}/DefensiveTransition_Susceptibility_examples.xlsx"
+        return f"{self.gpt_examples_base}/DefensiveTransition_Reaction_examples.xlsx"
+
+    @property
+    def describe_paths(self) -> list:
+        return [f"{self.describe_base}/DefensiveTransition_QnA.xlsx"]
+
+    def get_intro_messages(self):
+        intro = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert tactical football analyst specialising in defensive transitions. "
+                    "You analyse how Premier League teams behave when they lose possession in the attacking third "
+                    "and how vulnerable or resilient they are to counter-attacks. "
+                    "You provide clear, concise, and insightful tactical summaries grounded in data."
+                ),
+            },
+        ]
+        if len(self.describe_paths) > 0:
+            intro += [
+                {
+                    "role": "user",
+                    "content": "First, could you answer some questions about the data for me?",
+                },
+                {"role": "assistant", "content": "Sure!"},
+            ]
+        return intro
+
+    def synthesize_text(self) -> str:
+        team = self.team
+        ser = team.ser_metrics
+        quality = self.quality
+
+        text = (
+            f"Here is a statistical description of {team.name}'s defensive transition "
+            f"({quality}). "
+        )
+
+        # Add total losses context first
+        if "total_losses" in ser.index:
+            z = ser.get("total_losses_Z", 0)
+            text += (
+                f"They had {int(ser['total_losses'])} ball losses in the attacking third "
+                f"({sentences.describe_level(z)} compared to league average). "
+            )
+
+        # Describe each remaining metric using z-scores
+        for metric in team.relevant_metrics:
+            if metric == "total_losses":
+                continue
+            z_key = f"{metric}_Z"
+            if z_key not in ser.index:
+                continue
+            z_val = ser[z_key]
+            label = self.METRIC_LABELS.get(metric, metric.replace("_", " "))
+            level = sentences.describe_level(z_val)
+            text += f"They were {level} in {label}. "
+
+        return text
+
+    def get_prompt_messages(self):
+        prompt = (
+            "Please use the statistical description enclosed with ``` to give a concise, "
+            "4-sentence tactical summary of this team's defensive transition. "
+            "The first sentence should give an overall impression of how vulnerable the team is "
+            "when losing the ball high up the pitch. "
+            "The second sentence should highlight their specific strengths based on the data. "
+            "The third sentence should describe their weaknesses or areas of concern. "
+            "The final sentence should compare them to other Premier League teams overall."
+        )
+        return [{"role": "user", "content": prompt}]
+

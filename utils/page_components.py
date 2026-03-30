@@ -73,6 +73,7 @@ def add_page_selector():
     st.page_link("pages/personality_test.py", label="Personality Test")
     st.page_link("pages/MU_defensive.py", label="Defensive Analysis")
     st.page_link("pages/test.py", label="Test-Defensive Analysis")
+    st.page_link("pages/defensive_transition.py", label="Defensive Transition")
 
     # st.image("data/ressources/img/TwelveEdu.png")
 

@@ -54,3 +54,15 @@ class Person(Stat):
         self.id = id
         self.name = name
         self.ser_metrics = ser_metrics
+
+
+class Team(Stat):
+
+    def __init__(self, id, name, ser_metrics, relevant_metrics, quality):
+
+        self.id = id
+        self.name = name
+        self.quality = quality
+        self.relevant_metrics = relevant_metrics
+        # Save metrics as a Series
+        self.ser_metrics = ser_metrics

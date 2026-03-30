@@ -6,8 +6,8 @@ import pandas as pd
 
 
 from utils.sentences import format_metric
-from classes.data_point import Player, Country, Person
-from classes.data_source import PlayerStats, CountryStats, PersonStat
+from classes.data_point import Player, Country, Person, Team
+from classes.data_source import PlayerStats, CountryStats, PersonStat, TeamStats
 from typing import Union
 
 
@@ -511,6 +511,121 @@ class DistributionPlotPersonality(Visual):
         title = f"Evaluation of {person.name}"
         subtitle = f"Based on Big Five scores"
         self.add_title(title, subtitle)
+
+
+class DistributionPlotTeam(DistributionPlot):
+    def __init__(self, *args, **kwargs):
+        # We set plot_type to "team" so it doesn't include "per 90" in the annotations
+        kwargs["plot_type"] = "team"
+        super().__init__(*args, **kwargs)
+        
+        # Calculate a dynamic height based on the number of metrics
+        # Base height (margins, title, legend) is ~150px, each metric row needs ~70px
+        self.dynamic_height = 150 + (70 * len(self.columns))
+        
+        # Update the layout with the new height
+        self.fig.update_layout(height=self.dynamic_height)
+
+    def _setup_axes(self, labels=["Worse", "Average", "Better"]):
+        # Call parent to get basic setup
+        super()._setup_axes(labels=labels)
+        
+        # Explicitly set y-axis ticks so every metric row gets a horizontal line
+        self.fig.update_yaxes(
+            tickmode="array",
+            tickvals=list(range(len(self.columns))),
+            showgrid=True,
+            range=[-0.5, len(self.columns)],  # Increased top range to len(self.columns) to prevent clipping
+        )
+
+    def add_data_point(
+        self, ser_plot, plots, name, hover="", hover_string="", text=None
+    ):
+        if text is None:
+            text = [name]
+        elif isinstance(text, str):
+            text = [text]
+        legend = True
+        color = next(self.marker_color)
+        marker = next(self.marker_shape)
+
+        for i, col in enumerate(self.columns):
+            temp_hover_string = hover_string
+            metric_name = format_metric(col)
+
+            self.fig.add_trace(
+                go.Scatter(
+                    x=[ser_plot[col + plots]],
+                    y=[i],
+                    mode="markers",
+                    marker={
+                        "color": rgb_to_color(color, opacity=0.5),
+                        "size": 10,
+                        "symbol": marker,
+                        "line_width": 1.5,
+                        "line_color": rgb_to_color(color),
+                    },
+                    hovertemplate="%{text}<br>" + temp_hover_string + "<extra></extra>",
+                    text=text,
+                    customdata=[ser_plot[col + hover]],
+                    name=name,
+                    showlegend=legend,
+                )
+            )
+            legend = False
+
+            # Increased offset to 0.6 and font size to 14 for better readability
+            self.fig.add_annotation(
+                x=0,
+                y=i + 0.6,
+                text=self.annotation_text.format(
+                    metric_name=metric_name,
+                    data=ser_plot[col],
+                ),
+                showarrow=False,
+                font={
+                    "color": rgb_to_color(self.white),
+                    "family": "Gilroy-Light",
+                    "size": 14 * self.font_size_multiplier,
+                },
+            )
+
+    def show(self):
+        """Override show to use the dynamic height."""
+        st.plotly_chart(
+            self.fig,
+            config={"displayModeBar": False},
+            height=self.dynamic_height,
+            use_container_width=True,
+        )
+
+    def add_title_from_team(self, team: Team):
+        self.team = team
+        title = f"Defensive Transition — {team.name}"
+        subtitle = f"Quality: {team.quality} | Premier League 2024/25"
+        self.add_title(title, subtitle)
+
+    def add_team(self, team: Team, n_group: int):
+        """Highlight the focal team on the distribution plot."""
+        ser_plot = team.ser_metrics
+        self.add_data_point(
+            ser_plot=ser_plot,
+            plots="_Z",
+            name=team.name,
+            hover="_Ranks",
+            hover_string="Rank: %{customdata}/" + str(n_group),
+        )
+
+    def add_teams(self, teams: TeamStats):
+        """Add all 20 teams as background dots."""
+        self.add_group_data(
+            df_plot=teams.df,
+            plots="_Z",
+            names=teams.df["team"],
+            hover="_Ranks",
+            hover_string="Rank: %{customdata}/" + str(len(teams.df)),
+            legend="Other teams  ",
+        )
 
 
 """class ViolinPlot(Visual):
