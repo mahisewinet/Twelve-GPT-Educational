@@ -832,8 +832,8 @@ class TeamDescription(Description):
         if "total_losses" in ser.index:
             z = ser.get("total_losses_Z", 0)
             text += (
-                f"They had {int(ser['total_losses'])} ball losses in the attacking third "
-                f"({sentences.describe_level(z)} compared to league average). "
+                f"In total ball losses in the attacking third, they were "
+                f"{sentences.describe_level(z)} compared to league average. "
             )
 
         # Describe each remaining metric using z-scores
@@ -851,11 +851,17 @@ class TeamDescription(Description):
         return text
 
     def get_prompt_messages(self):
+        # Tailor the first sentence instruction based on the quality
+        if self.quality == self.QUALITY_SUSCEPTIBILITY:
+            first_sentence_instr = "give an overall impression of the team's structural vulnerability and how far they allow opponents to progress toward their goal immediately after a ball loss."
+        else:
+            first_sentence_instr = "give an overall impression of how effectively the team reacts and recovers during the most dangerous counter-attack windows (where opponents reach the defensive third within 6 seconds)."
+
         prompt = (
-            "Please use the statistical description enclosed with ``` to give a concise, "
-            "4-sentence tactical summary of this team's defensive transition. "
-            "The first sentence should give an overall impression of how vulnerable the team is "
-            "when losing the ball high up the pitch. "
+            f"Please use the statistical description enclosed with ``` to give a concise, "
+            f"4-sentence tactical summary of this team's **defensive transition**, "
+            f"specifically focusing on their **{self.quality}**. "
+            f"The first sentence should {first_sentence_instr} "
             "The second sentence should highlight their specific strengths based on the data. "
             "The third sentence should describe their weaknesses or areas of concern. "
             "The final sentence should compare them to other Premier League teams overall."
